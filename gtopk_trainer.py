@@ -15,6 +15,7 @@ comm.Set_errhandler(MPI.ERRORS_RETURN)
 
 from dl_trainer import DLTrainer, _support_datasets, _support_dnns
 from compression import compressors
+from traceback import print_exception
 
 from settings import logger, formatter
 import horovod.torch as hvd
@@ -56,10 +57,10 @@ def robust_ssgd(dnn, dataset, data_dir, nworkers, lr, batch_size, nsteps_update,
 
     trainer.update_optimizer(optimizer)
 
-    iters_per_epoch = trainer.get_num_of_training_samples() / (nworkers * batch_size * nsteps_update)
+    iters_per_epoch = trainer.get_num_of_training_samples() // (nworkers * batch_size * nsteps_update)
 
     times = []
-    NUM_OF_DISLAY = 100
+    NUM_OF_DISLAY = 40
     display = NUM_OF_DISLAY if iters_per_epoch > NUM_OF_DISLAY else iters_per_epoch-1
     logger.info('Start training ....')
     for epoch in range(max_epochs):
@@ -165,4 +166,7 @@ if __name__ == '__main__':
     logger.info('Configurations: %s', args)
     
     logger.info('Interpreter: %s', sys.version)
-    robust_ssgd(args.dnn, args.dataset, args.data_dir, args.nworkers, args.lr, args.batch_size, args.nsteps_update, args.max_epochs, args.compression, args.compressor, args.nwpernode, args.sigma_scale, args.pretrain, args.density, prefix)
+    try:
+        robust_ssgd(args.dnn, args.dataset, args.data_dir, args.nworkers, args.lr, args.batch_size, args.nsteps_update, args.max_epochs, args.compression, args.compressor, args.nwpernode, args.sigma_scale, args.pretrain, args.density, prefix)
+    except Exception as e:
+        logger.info('Main thread exception: %s', e)

@@ -595,10 +595,6 @@ class DLTrainer:
             if self.train_iter % self.num_batches_per_epoch == 0 and self.train_iter > 0:
                 logger.info('train iter: %d, num_batches_per_epoch: %d', self.train_iter, self.num_batches_per_epoch)
                 logger.info('Epoch %d, avg train acc: %f, lr: %f, avg loss: %f' % (self.train_iter//self.num_batches_per_epoch, np.mean(self.train_acc_top1), self.lr, self.avg_loss_per_epoch/self.num_batches_per_epoch))
-                mean_s = np.mean(self.sparsities)
-                if self.train_iter>0 and np.isnan(mean_s):
-                    logger.warn('NaN detected! sparsities:  %s' % self.sparsities)
-                logger.info('Average Sparsity: %f, compression ratio: %f, communication size: %f', np.mean(self.sparsities), np.mean(self.compression_ratios), np.mean(self.communication_sizes))
                 if self.rank == 0 and self.writer is not None:
                     self.writer.add_scalar('cross_entropy', self.avg_loss_per_epoch/self.num_batches_per_epoch, self.train_epoch)
                     self.writer.add_scalar('top-1 acc', np.mean(self.train_acc_top1), self.train_epoch)
@@ -672,7 +668,7 @@ class DLTrainer:
 
             if self.dnn not in ['lstm', 'lstman4']:
                 acc1, = self.cal_accuracy(outputs, labels, topk=(1,))
-                self.train_acc_top1.append(acc1)
+                self.train_acc_top1.append(float(acc1))
                 
             self.train_iter += 1
         self.num_of_updates_during_comm += 1
@@ -682,9 +678,6 @@ class DLTrainer:
         if self.train_iter % display == 0:
             logger.info('[%3d][%5d/%5d][rank:%d] loss: %.3f, average forward and backward time: %f, iotime: %f ' %
                   (self.train_epoch, self.train_iter, self.num_batches_per_epoch, self.rank,  self.loss, self.timer/display, self.iotime/display))
-            mbytes = 1024.*1024
-            logger.info('GPU memory usage memory_allocated: %d MBytes, max_memory_allocated: %d MBytes, memory_cached: %d MBytes, max_memory_cached: %d MBytes, CPU memory usage: %d MBytes', 
-                    ct.memory_allocated()/mbytes, ct.max_memory_allocated()/mbytes, ct.memory_cached()/mbytes, ct.max_memory_cached()/mbytes, process.memory_info().rss/mbytes)
             self.timer = 0.0
             self.iotime = 0.0
             if self.is_cuda:

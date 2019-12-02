@@ -88,8 +88,6 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                     d_p = buf
                 self._handles[p] = self._allreducer.add_tensor(name, d_p)
                 torch.cuda.synchronize()
-                #if rank() == 0:
-                #    logger.info('-->pushed time [%s]: %s, norm: %f', name, time.time(), p.grad.data.norm())
                 self._msg_queue.put(name)
         return hook
     
@@ -99,7 +97,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
             self._synced = True
         for p, value in self._handles.items():
             output = self._allreducer.get_result(value)
-            p.grad.data.set_(output.data)
+            p.grad.set_(output.data)
         self._handles.clear()
 
     def _step(self, closure=None):
@@ -125,8 +123,6 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                 name = self._parameter_names.get(p)
                 if weight_decay != 0:
                     d_p.add_(weight_decay, p.data)
-                #if name.find('bias') >= 0 or name.find('bn') >= 0:
-                #    print('batch norm or bias detected, continue, %s' % name)
                 if momentum != 0 and not self.momentum_correction:
                     param_state = self.state[p]
                     if 'momentum_buffer' not in param_state:

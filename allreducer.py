@@ -23,7 +23,7 @@ MPI_TYPES = {
         np.float16: mpi_float16
         }
 
-THRESHOLD = 640*1024*1024
+THRESHOLD = 100*1024*1024
 
 
 def topk_sparse_allreduce(comm, sparse_tensor, storage, indexes=None, dtype=np.float32):
@@ -137,7 +137,7 @@ def gtopk_sparse_allreduce(comm, sparse_tensor, storage=None, indexes=None, dtyp
                 target = participate_ranks[local_rank-1]
                 logger.debug('[round:%d], %d(%d)->%d(%d)', i, rank, local_rank, target, local_rank-1)
                 comm.Send([send_values, MPI.FLOAT], dest=target)
-        exist_workers /= 2
+        exist_workers //= 2
         step *= 2
         participate_ranks = range(0, num_workers, step)
         comm.Barrier()
@@ -185,7 +185,7 @@ class AllReducer():
         self._msg_queue = msg_queue
         self._msg_queue2 = msg_queue2
         self._writer = writer
-        self._profiling = True
+        self._profiling = False
         self._entries = {}
         self._keys = []
         self._outputs = {}
@@ -260,8 +260,8 @@ class AllReducer():
     def _generate_merged_parameters(self):
         self._merged_parameters = {}
         groups, key_groupidx_maps = self._generate_groups_with_threshold(THRESHOLD)
-        logger.info('groups: %s', groups)
-        logger.info('key_groupidx_maps: %s', key_groupidx_maps)
+        #logger.info('groups: %s', groups)
+        #logger.info('key_groupidx_maps: %s', key_groupidx_maps)
         new_keys = []
         self._merged_parameter_offsets = {}
         for g in groups:
@@ -618,7 +618,7 @@ def benchmark_gtopk_sparse_allreduce():
     logger.debug('[%d]%s', rank, tensor)
     storage = {}
 
-    t = gtopk_sparse_allreduce(comm, tensor, storage=storage, indexes=indexes)
+    t = gtopk_sparse_allreduce(comm, tmp, storage=storage, indexes=indexes)
     iteration = 10
     stime = time.time()
     for i in range(iteration):

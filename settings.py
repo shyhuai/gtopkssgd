@@ -18,7 +18,7 @@ if WARMUP:
 
 PREFIX=PREFIX+'-dc'+str(DELAY_COMM)
 PREFIX=PREFIX+'-model'+'-ijcai2019'
-TENSORBOARD=True
+TENSORBOARD=False
 PROFILING_NORM=False
 
 hostname = socket.gethostname() 
