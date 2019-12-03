@@ -6,8 +6,10 @@ compressor="${compressor:-gtopk}"
 nworkers="${nworkers:-4}"
 nwpernode=4
 sigmascale=2.5
-MPIPATH=/usr/local/openmpi/openmpi-4.0.1
-PY=python
+#MPIPATH=/usr/local/openmpi/openmpi-4.0.1
+#PY=python
+PY=/home/comp/csshshi/anaconda2/bin/python
+MPIPATH=/home/comp/csshshi/local/openmpi3.1.1
 $MPIPATH/bin/mpirun --prefix $MPIPATH -np $nworkers -hostfile cluster$nworkers --bind-to none -map-by slot \
     -x LD_LIBRARY_PATH \
     -mca pml ob1 -mca btl ^openib \

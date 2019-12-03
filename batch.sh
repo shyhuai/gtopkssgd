@@ -4,7 +4,7 @@ dnns=( "resnet20" )
 compressors=( "gtopkr" ) 
 #compressors=( "none" ) 
 #ns=( "32" "16" "8" "4" )
-ns=( "32" )
+ns=( "4" )
 density=0.001
 for dnn in "${dnns[@]}"
 do

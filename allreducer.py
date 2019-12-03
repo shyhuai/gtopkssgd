@@ -254,6 +254,8 @@ def gtopk_sparse_recursive_allreduce(comm, sparse_tensor, storage=None, indexes=
         comm.Barrier()
 
     included_indexes = np.nonzero(mask)[0]
+    values = values.astype(np.float32)
+    indexes = indexes.astype(np.uint32)
     return values, indexes, included_indexes # final selected values and indexes
 
 
