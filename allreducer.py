@@ -163,6 +163,100 @@ def gtopk_sparse_allreduce(comm, sparse_tensor, storage=None, indexes=None, dtyp
     return values, indexes, included_indexes # final selected values and indexes
 
 
+def gtopk_sparse_recursive_allreduce(comm, sparse_tensor, storage=None, indexes=None, dtype=np.float32):
+    """
+    0: 0(0) <-> 1(1), 2(2) <-> 3(3), 4(4) <-> 5(5), 6(6) <-> 7(7)
+    1: 0 <-> 2, 1 <-> 3, 4 <-> 6, 5 <-> 7
+    2: 0 <-> 4, 1 <-> 5, 2 <-> 6, 3 <-> 7
+    """
+    num_workers = comm.size
+    rank = comm.rank
+
+    tensor = sparse_tensor
+    if indexes is None:
+        k = int(tensor.size * 0.001)
+        indexes, values = utils.topk(tensor, k)
+    else:
+        if not (type(indexes) is np.ndarray):
+            indexes = indexes.cpu().numpy()
+        k = len(indexes)
+        values = tensor 
+
+    original_indexes = indexes
+    send_values = np.concatenate((indexes, values))
+    send_values[0:k] = indexes.astype(np.uint32)
+    send_values[k:2*k] = values.astype(np.float32)
+
+    original_indexes = indexes
+    original_order_indexes = np.arange(0, k)
+    mask = np.ones(k, dtype=np.int)
+
+    if storage is not None and 'result_v2' in storage:
+        recv_values = storage['result_v2']
+        if recv_values.size < k*2:
+            recv_values = np.zeros_like(send_values)
+            if storage:
+                storage['result_v2'] = recv_values
+        recv_values = recv_values[0:k*2]
+    else:
+        recv_values = np.zeros_like(send_values)
+        if storage:
+            storage['result_v2'] = recv_values
+
+    num_round = int(np.log2(num_workers))
+    peer_masks = np.zeros(num_workers, dtype=np.int)
+    for i in range(num_round):
+        peer_distance = 2**i
+        for j in range(num_workers):
+            local_rank = j % (2 * peer_distance)
+            if local_rank < peer_distance:
+                peer_masks[j] = 1
+            else:
+                peer_masks[j] = -1
+        peer = peer_masks[rank] * peer_distance + rank
+        logger.debug('Start round: %d [%d]<->[%d]', i, rank, peer)
+        recv_req = comm.Irecv([recv_values, MPI.FLOAT], source=peer)
+        send_req = comm.Isend([send_values, MPI.FLOAT], dest=peer)
+        send_req.Wait()
+        recv_req.Wait()
+
+        if rank < peer:
+            first_indexes = indexes
+            first_values = values
+            second_indexes = recv_values[0:k].astype(np.int)
+            second_values = recv_values[k:2*k]
+        else:
+            first_indexes = recv_values[0:k].astype(np.int)
+            first_values = recv_values[k:2*k]
+            second_indexes = indexes
+            second_values = values
+
+        cv, c1, c2 = np.intersect1d(first_indexes, second_indexes, assume_unique=True, return_indices=True)
+        first_values[c1] += second_values[c2]
+        second_values[c2] = 0.0
+        tmp_c = np.concatenate((first_values, second_values))
+        tmp_topki, _ = utils.topk(np.abs(tmp_c), k)
+        first_array_indexes = tmp_topki[tmp_topki < k]
+        second_array_indexes = tmp_topki[tmp_topki >= k]-k
+
+        indexes = np.concatenate((first_indexes[first_array_indexes], second_indexes[second_array_indexes]))
+        values = np.concatenate((first_values[first_array_indexes], second_values[second_array_indexes]))
+
+        cv, c1, c2 = np.intersect1d(original_indexes, indexes, assume_unique=True, return_indices=True)
+        diff = np.setdiff1d(original_order_indexes, c1, assume_unique=True)
+        mask[diff] = 0
+
+        send_values = np.concatenate((indexes, values))
+        send_values[0:k] = indexes.astype(np.uint32)
+        send_values[k:2*k] = values.astype(np.float32)
+        comm.Barrier()
+        logger.debug('End round: %d: %s', rank, send_values)
+        comm.Barrier()
+
+    included_indexes = np.nonzero(mask)[0]
+    return values, indexes, included_indexes # final selected values and indexes
+
+
 def dense_allreduce(comm, tensor):
     result = np.zeros_like(tensor)
     op = MPI.SUM
@@ -445,6 +539,8 @@ class AllReducer():
             result, global_indexes, included_indexes = topk_sparse_allreduce(self._comm, entry, self._sparse_storages[name], indexes=topk_indexes, dtype=np.float32)
         elif self._compression.name in ['gtopk']:
             result, global_indexes, included_indexes = gtopk_sparse_allreduce(self._comm, entry, storage=self._sparse_storages[name], indexes=topk_indexes, dtype=np.float32)
+        elif self._compression.name in ['gtopkr']:
+            result, global_indexes, included_indexes = gtopk_sparse_recursive_allreduce(self._comm, entry, storage=self._sparse_storages[name], indexes=topk_indexes, dtype=np.float32)
 
         r = torch.from_numpy(result)
         gi = torch.from_numpy(global_indexes.astype(np.int64))
@@ -456,7 +552,7 @@ class AllReducer():
             final_indexes = gi 
 
         tensor.fill_(0.0)
-        if self._compression.name in ['gtopk']:
+        if self._compression.name in ['gtopk', 'gtopkr']:
             tensor[final_indexes] = r
         elif self._compression.name in ['topk', 'topk2']:
             num_workers = self._comm.size
@@ -601,12 +697,12 @@ class AllReducer():
 
 
 def benchmark_gtopk_sparse_allreduce():
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     comm = MPI.COMM_WORLD
     rank = comm.rank
     #np.random.seed(rank)
-    size = 25 * 1024 * 1024
-    ratio = 0.001
+    size = 10
+    ratio = 0.5
     tensor = np.random.rand(size).astype(np.float32)
     k = int(tensor.size * ratio)
     indexes, values = utils.topk(tensor, k)
@@ -618,13 +714,15 @@ def benchmark_gtopk_sparse_allreduce():
     logger.debug('[%d]%s', rank, tensor)
     storage = {}
 
-    t = gtopk_sparse_allreduce(comm, tmp, storage=storage, indexes=indexes)
+    #t = gtopk_sparse_allreduce(comm, tmp, storage=storage, indexes=indexes)
+    result, global_indexes, included_indexes = gtopk_sparse_recursive_allreduce(comm, tmp, storage=storage, indexes=indexes, dtype=np.float32)
     iteration = 10
     stime = time.time()
-    for i in range(iteration):
-        t,_ = gtopk_sparse_allreduce(comm, tensor, storage=storage, indexes=indexes)
+    logger.debug('[%d]value: %s, \n indexes: %s, \n included_indexes: %s', rank, result, global_indexes, included_indexes)
+    #for i in range(iteration):
+    #    t,_ = gtopk_sparse_allreduce(comm, tmp, storage=storage, indexes=indexes)
     total_time = time.time() - stime
-    logger.info('average time: %f', total_time/iteration)
+    #logger.info('average time: %f', total_time/iteration)
 
 
 if __name__ == '__main__':

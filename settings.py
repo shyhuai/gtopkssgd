@@ -17,7 +17,8 @@ if WARMUP:
     PREFIX=PREFIX+'-gwarmup'
 
 PREFIX=PREFIX+'-dc'+str(DELAY_COMM)
-PREFIX=PREFIX+'-gtopkjournal'
+#PREFIX=PREFIX+'-gtopkjournal'
+PREFIX=PREFIX+'-debug'
 TENSORBOARD=False
 PROFILING_NORM=False
 

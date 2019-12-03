@@ -85,10 +85,14 @@ class TopKCompressor2(TopKCompressor):
 class gTopKCompressor(TopKCompressor):
     name = 'gtopk'
 
+class gTopKRecursiveCompressor(TopKCompressor):
+    name = 'gtopkr'
+
 
 compressors = {
         'topk': TopKCompressor,
         'topk2': TopKCompressor2,
         'gtopk': gTopKCompressor,
+        'gtopkr': gTopKRecursiveCompressor,
         'none': NoneCompressor
         }

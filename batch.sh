@@ -1,10 +1,10 @@
 dnns=( "resnet20" "vgg16" )
-#dnns=( "vgg16" )
+dnns=( "resnet20" )
 #compressors=( "gtopk" "topk" ) 
-#compressors=( "topk" ) 
-compressors=( "none" ) 
-ns=( "32" "16" "8" "4" )
-#ns=( "32" )
+compressors=( "gtopkr" ) 
+#compressors=( "none" ) 
+#ns=( "32" "16" "8" "4" )
+ns=( "32" )
 density=0.001
 for dnn in "${dnns[@]}"
 do
