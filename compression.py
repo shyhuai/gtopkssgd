@@ -38,7 +38,13 @@ class TopKCompressor():
             numel = tensor.numel()
             k = max(int(numel * ratio), 1)
 
+            #nonzero = torch.abs(TopKCompressor.residuals[name]) > 0
+            #nonzero_indexes = nonzero.nonzero().data.squeeze().view(-1)
+            #if nonzero_indexes.numel() > 0:
+            #    tensor.data[nonzero_indexes] *= 1.01
             tensor.data.add_(TopKCompressor.residuals[name].data)
+            if name in TopKCompressor.indexes:
+                tensor.data[TopKCompressor.indexes[name]] *= 1.01 # some improvement!
 
             values, indexes = torch.topk(torch.abs(tensor.data), k=k)
             values = tensor.data[indexes]
@@ -73,6 +79,7 @@ class TopKCompressor():
             values = TopKCompressor.values[name]
             values.data[indexes_t] = 0.0
             residuals.data[TopKCompressor.indexes[name]] += values.data
+            TopKCompressor.indexes[name] = TopKCompressor.indexes[name][indexes_t]
 
     @staticmethod
     def decompress(tensor, ctc, name=None):

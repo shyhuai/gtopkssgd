@@ -54,9 +54,13 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._lock = threading.Lock()
         self._key_lock = threading.Lock()
         self.momentum_correction = False
-        self._allreducer = ar.AllReducer(named_parameters, self._lock, self._key_lock, compressor, sparse=self._sparse, err_callback=err_handler, layerwise_times=layerwise_times, sigma_scale=sigma_scale, density=density, norm_clip=norm_clip, msg_queue=self._msg_queue, msg_queue2=self._msg_queue2, writer=writer)
-        self.allreducer_thread = threading.Thread(name='allreducer', target=self._allreducer.run)
-        self.allreducer_thread.start()
+        try:
+            self._allreducer = ar.AllReducer(named_parameters, self._lock, self._key_lock, compressor, sparse=self._sparse, err_callback=err_handler, layerwise_times=layerwise_times, sigma_scale=sigma_scale, density=density, norm_clip=norm_clip, msg_queue=self._msg_queue, msg_queue2=self._msg_queue2, writer=writer)
+            self.allreducer_thread = threading.Thread(name='allreducer', target=self._allreducer.run)
+            self.allreducer_thread.start()
+        except Exception as e:
+            logger.error('Allreducer thread error: %s', e)
+            raise
         self.local = False
         self._synced = False
 

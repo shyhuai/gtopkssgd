@@ -281,7 +281,7 @@ class AllReducer():
         self._msg_queue = msg_queue
         self._msg_queue2 = msg_queue2
         self._writer = writer
-        self._profiling = True
+        self._profiling = False
         self._update_index_counter = {}
         self._entries = {}
         self._keys = []
@@ -383,7 +383,7 @@ class AllReducer():
             self._groups_flags.append(flags)
         logger.info('offsets: ', self._merged_parameter_offsets)
         for k, v in self._merged_parameters.items():
-            self._update_index_counter[k] = torch.zeros(v.numel())
+            self._update_index_counter[k] = torch.zeros_like(v)
 
     def _push_to_buffer(self, name, tensor):
         if len(self._groups) == len(self._sequential_keys):
@@ -441,7 +441,7 @@ class AllReducer():
             d2hs = self._d2h_times
             h2ds = self._h2d_times
             l = 0
-            logger.info('[rank:%d]name[size]: backward, merge, compression, allreduce, demerge, d2h, h2d')
+            logger.info('[rank]name[size]: backward, merge, compression, allreduce, demerge, d2h, h2d')
             total_sz = 0
             total_ct = 0.0
             total_mg = 0.0
@@ -485,8 +485,6 @@ class AllReducer():
                 d2hs.pop(k, None)
                 h2ds.pop(k, None)
             logger.info('[rank:%d]%s[%d]: %f,%f,%f,%f,%f,%f,%f', self.rank(), 'total', total_sz, total_ct,total_mg,total_cp,total_ar,total_dm,total_d2h,total_h2d)
-            for k, v in self._update_index_counter.items():
-                logger.info('[rank:%d] name: %s, min_count: %f, max_count: %f', self.rank(), k, torch.min(v), torch.max(v))
 
     def reset(self):
         self._for_reductions = self._default_for_reductions.copy()
@@ -562,13 +560,16 @@ class AllReducer():
         tensor.fill_(0.0)
         if self._compression.name in ['gtopk', 'gtopkr']:
             tensor[final_indexes] = r
-            self._update_index_counter[name][final_indexes] += 1
+            if settings.PROFILING_INDEX:
+                self._update_index_counter[name][final_indexes] += 1
         elif self._compression.name in ['topk', 'topk2']:
             num_workers = self._comm.size
             nnz = topk_indexes.size(0)
             for i in range(num_workers):
                 index = final_indexes[i*nnz:(i+1)*nnz]
                 tensor[index] += r[i*nnz:(i+1)*nnz]
+                if settings.PROFILING_INDEX:
+                    self._update_index_counter[name][index] += 1
             if self._compression.name == 'topk2':
                 values, indexes = torch.topk(torch.abs(tensor.data), k=nnz)
                 cv, c1, c2 = np.intersect1d(indexes.cpu().numpy(), topk_indexes.cpu().numpy(), assume_unique=False, return_indices=True)

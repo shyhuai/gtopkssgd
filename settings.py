@@ -17,10 +17,11 @@ if WARMUP:
     PREFIX=PREFIX+'-gwarmup'
 
 PREFIX=PREFIX+'-dc'+str(DELAY_COMM)
-PREFIX=PREFIX+'-gtopkjournal-v2'
+PREFIX=PREFIX+'-gtopkjournal-v3'
 #PREFIX=PREFIX+'-debug'
 TENSORBOARD=False
 PROFILING_NORM=False
+PROFILING_INDEX=False
 
 hostname = socket.gethostname() 
 logger = logging.getLogger(hostname)

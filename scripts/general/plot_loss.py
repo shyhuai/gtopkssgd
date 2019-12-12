@@ -11,6 +11,9 @@ import numpy as np
 import datetime
 import itertools
 import utils as u
+from scipy.signal import savgol_filter
+SMOOTH_CURVE=False
+
 markers=['.','x','o','v','^','<','>','1','2','3','4','8','s','p','*']
 #markers=[None]
 colors = ['b', 'g', 'r', 'm', 'y', 'k', 'orange', 'purple', 'olive']
@@ -157,6 +160,31 @@ def read_norm_from_log(logfile):
     print('stds: ', stds)
     return means, stds
 
+
+def plot_sub_boxes(ax, name=None):
+
+    #Plot subboxes
+    bbox_to_anchor = (-0.02, -0.08, 1, 0.95)
+    if name == 'lstm':
+        bbox_to_anchor = (-0.02, -0.28, 1, 0.95)
+    subaxes = inset_axes(ax,
+        width='50%', 
+        height='30%', 
+        bbox_to_anchor=bbox_to_anchor,
+        bbox_transform=ax.transAxes,
+        loc='upper right')
+    plts = ax.lines
+    #subaxes.set_ylim(bottom=0.85, top=0.95)
+    for line in plts:
+        x = line.get_xdata()
+        y = line.get_ydata()
+        half = len(x)*3//4
+        subx = x[half:]
+        suby = y[half:]
+        subaxes.plot(subx, suby, color=line.get_color(), marker=line.get_marker(), markerfacecolor='none', linewidth=1.5)
+    subaxes.set_ylim(bottom=subaxes.get_ylim()[0])
+
+
 def plot_loss(logfile, label, isacc=False, title='ResNet-20', fixed_color=None):
     losses, times, average_delays, lrs = read_losses_from_log(logfile, isacc=isacc)
     norm_means, norm_stds = read_norm_from_log(logfile)
@@ -181,6 +209,9 @@ def plot_loss(logfile, label, isacc=False, title='ResNet-20', fixed_color=None):
         color = coloriter.next()
 
     iterations = np.arange(len(losses)) 
+    if SMOOTH_CURVE:
+        losses = savgol_filter(losses, 5, 3)
+    print('Algo: %s max acc: %f' % (label, np.max(losses)))
     line = ax.plot(iterations, losses, label=label, marker=marker, markerfacecolor='none', color=color, linewidth=1)
     if False and len(norm_means) > 0:
         global ax2
@@ -406,9 +437,11 @@ def plot_convergence(lax=None, network=None, subfig=None):
             line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
             update='v2'
             line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
-        #for nworkers in nworkers_list:
-        #    bs=16
-        #    line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,bs=%d)'%(nworkers,bs),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-v1', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+            update='v3'
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+        for nworkers in nworkers_list:
+            bs=16
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,bs=%d)'%(nworkers,bs),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-v1', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
 
         markeriter = itertools.cycle(markers)
         density=0.001;lr=0.1;bs=32
@@ -463,6 +496,7 @@ def plot_single_convergence():
     #network='densenet201';
     #network='inceptionv4';
     plts = plot_convergence(ax, network)
+    #plot_sub_boxes(ax)
     ax.legend()
     ax.grid(linestyle=':')
 

@@ -92,6 +92,11 @@ def robust_ssgd(dnn, dataset, data_dir, nworkers, lr, batch_size, nsteps_update,
                 logger.info('Time per iteration including communication: %f. Speed: %f images/s, current density: %f', time_per_iter, batch_size * nsteps_update / time_per_iter, optimizer.get_current_density())
                 times = []
         optimizer.add_train_epoch()
+        if settings.PROFILING_INDEX and rank == 0 and epoch % 10 == 0:
+            fn = os.path.join(relative_path, 'index-rank%d-epoch%d.npy' % (rank, epoch))
+            key = list(optimizer._allreducer._update_index_counter.keys())[0]
+            np.save(fn, optimizer._allreducer._update_index_counter[key].int().cpu().numpy())
+
         if settings.PROFILING_NORM:
             # For comparison purpose ===>
             fn = os.path.join(relative_path, 'gtopknorm-rank%d-epoch%d.npy' % (rank, epoch))
