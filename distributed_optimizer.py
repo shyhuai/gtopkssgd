@@ -138,6 +138,42 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                 p.data.add_(-group['lr'], d_p)
         return loss
 
+    def _step_with_lars(self, closure=None):
+        """Performs a single optimization step with LARS optimization.
+            Arguments:
+                closure (callable, optional): A closure that reevaluates the model
+                    and returns the loss.
+        """
+        loss = None
+        if closure is not None:
+            loss = closure()
+    
+        for group in self.param_groups:
+            weight_decay = group['weight_decay']
+            momentum = group['momentum']
+            eta = group.get('eta', 0.001)
+            lr = group['lr']
+    
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                d_p = p.grad.data
+                weight_norm = torch.norm(p.data)
+                grad_norm = torch.norm(d_p)
+                local_lr = eta * weight_norm / (grad_norm + weight_decay * weight_norm+1e-6)
+                actual_lr = local_lr * lr 
+                name = self._parameter_names.get(p)
+                #logger.info('name:%s, weight_norm: %f, grad_norm: %f, local_lr: %f, actual_lr: %f', name, weight_norm.item(), grad_norm.item(), local_lr, actual_lr)
+
+                param_state = self.state[p]
+                if 'momentum_buffer' not in param_state:
+                    buf = param_state['momentum_buffer'] = torch.zeros_like(p.data)
+                else:
+                    buf = param_state['momentum_buffer']
+                buf.mul_(momentum).add_(actual_lr, d_p + weight_decay * p.data)
+                p.data.add_(-buf)
+        return loss
+
     def _step_with_mc(self, closure=None):
         """Performs a single optimization step with momemtum correction.
             Arguments:
@@ -180,6 +216,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         if not self.local:
             self.synchronize()
         ret = self._step(closure)
+        #ret = self._step_with_lars(closure)
         self._synced = False
         return ret
 

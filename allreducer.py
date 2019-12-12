@@ -24,6 +24,7 @@ MPI_TYPES = {
         }
 
 THRESHOLD = 100*1024*1024
+#THRESHOLD = 8192 
 
 
 def topk_sparse_allreduce(comm, sparse_tensor, storage, indexes=None, dtype=np.float32):
@@ -235,7 +236,7 @@ def gtopk_sparse_recursive_allreduce(comm, sparse_tensor, storage=None, indexes=
         first_values[c1] += second_values[c2]
         second_values[c2] = 0.0
         tmp_c = np.concatenate((first_values, second_values))
-        tmp_topki, _ = utils.topk(np.abs(tmp_c), k)
+        tmp_topki, _ = utils.topk(tmp_c, k)
         first_array_indexes = tmp_topki[tmp_topki < k]
         second_array_indexes = tmp_topki[tmp_topki >= k]-k
 
@@ -251,7 +252,6 @@ def gtopk_sparse_recursive_allreduce(comm, sparse_tensor, storage=None, indexes=
         send_values[k:2*k] = values.astype(np.float32)
         comm.Barrier()
         logger.debug('End round: %d: %s', rank, send_values)
-        comm.Barrier()
 
     included_indexes = np.nonzero(mask)[0]
     values = values.astype(np.float32)
@@ -281,7 +281,8 @@ class AllReducer():
         self._msg_queue = msg_queue
         self._msg_queue2 = msg_queue2
         self._writer = writer
-        self._profiling = False
+        self._profiling = True
+        self._update_index_counter = {}
         self._entries = {}
         self._keys = []
         self._outputs = {}
@@ -318,6 +319,7 @@ class AllReducer():
         self._h2d_times = {}
         self._d2h_times = {}
         self._profiling_norms = []
+
 
         #self._dynamic_densities = [0.25, 0.0625, 0.015625, 0.004, 0.001] # the setting used in DGC
         self._dynamic_densities = [0.004] # the tuned one 
@@ -380,6 +382,8 @@ class AllReducer():
                 flags.append(0)
             self._groups_flags.append(flags)
         logger.info('offsets: ', self._merged_parameter_offsets)
+        for k, v in self._merged_parameters.items():
+            self._update_index_counter[k] = torch.zeros(v.numel())
 
     def _push_to_buffer(self, name, tensor):
         if len(self._groups) == len(self._sequential_keys):
@@ -428,7 +432,7 @@ class AllReducer():
             self.allocate_storage(k, v)
 
     def _print_profiling(self):
-        if self._profiling and self.rank() == 0 and len(self._allreduce_timers.keys()) > 0 and len(self._allreduce_timers.get(self._allreduce_timers.keys()[0], [])) == 100:
+        if self._profiling and self.rank() == 0 and len(self._allreduce_timers.keys()) > 0 and len(self._allreduce_timers.get(self._allreduce_timers.keys()[0], [])) == 10:
             cts = self._layerwise_times # gpu computation
             mgs = self._merge_timers # merge_times
             cps = self._compression_timers # compression
@@ -481,6 +485,8 @@ class AllReducer():
                 d2hs.pop(k, None)
                 h2ds.pop(k, None)
             logger.info('[rank:%d]%s[%d]: %f,%f,%f,%f,%f,%f,%f', self.rank(), 'total', total_sz, total_ct,total_mg,total_cp,total_ar,total_dm,total_d2h,total_h2d)
+            for k, v in self._update_index_counter.items():
+                logger.info('[rank:%d] name: %s, min_count: %f, max_count: %f', self.rank(), k, torch.min(v), torch.max(v))
 
     def reset(self):
         self._for_reductions = self._default_for_reductions.copy()
@@ -556,6 +562,7 @@ class AllReducer():
         tensor.fill_(0.0)
         if self._compression.name in ['gtopk', 'gtopkr']:
             tensor[final_indexes] = r
+            self._update_index_counter[name][final_indexes] += 1
         elif self._compression.name in ['topk', 'topk2']:
             num_workers = self._comm.size
             nnz = topk_indexes.size(0)
@@ -700,10 +707,11 @@ class AllReducer():
 
 def benchmark_gtopk_sparse_allreduce():
     logger.setLevel(logging.DEBUG)
+    np.set_printoptions(precision=3)
     comm = MPI.COMM_WORLD
     rank = comm.rank
     #np.random.seed(rank)
-    size = 10
+    size = 8
     ratio = 0.5
     tensor = np.random.rand(size).astype(np.float32)
     k = int(tensor.size * ratio)
