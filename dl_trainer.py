@@ -188,6 +188,8 @@ class DLTrainer:
             weight_decay = 0.0
         elif self.dataset == 'imagenet':
             weight_decay = 5e-4
+        elif self.dataset == 'cifar10':
+            weight_decay = 0 #1e-4
 
         self.optimizer = optim.SGD(self.net.parameters(), 
                 lr=self.lr,
@@ -521,7 +523,7 @@ class DLTrainer:
         return self.lr 
 
     def _adjust_learning_rate_general(self, progress, optimizer):
-        warmup = 10
+        warmup = 5
         if settings.WARMUP and progress < warmup:
             warmup_total_iters = self.num_batches_per_epoch * warmup
             min_lr = self.base_lr / self.nworkers
@@ -544,7 +546,7 @@ class DLTrainer:
         if progress < first: 
             lr = self.base_lr
         elif progress < second: 
-            lr = self.base_lr * 0.1
+            lr = self.base_lr * 0.1 
         elif progress < third:
             lr = self.base_lr * 0.01
         else:

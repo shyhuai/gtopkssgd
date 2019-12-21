@@ -25,6 +25,7 @@ class TopKCompressor():
     sparsities = []
     t = 0.
     zero_conditions = {}
+    zc = None
     values = {} 
     indexes = {} 
     name = 'topk'
@@ -41,7 +42,7 @@ class TopKCompressor():
             #nonzero = torch.abs(TopKCompressor.residuals[name]) > 0
             #nonzero_indexes = nonzero.nonzero().data.squeeze().view(-1)
             #if nonzero_indexes.numel() > 0:
-            #    tensor.data[nonzero_indexes] *= 1.01
+            #    tensor.data[nonzero_indexes] *= 1.1
             tensor.data.add_(TopKCompressor.residuals[name].data)
             if name in TopKCompressor.indexes:
                 tensor.data[TopKCompressor.indexes[name]] *= 1.01 # some improvement!
@@ -80,6 +81,10 @@ class TopKCompressor():
             values.data[indexes_t] = 0.0
             residuals.data[TopKCompressor.indexes[name]] += values.data
             TopKCompressor.indexes[name] = TopKCompressor.indexes[name][indexes_t]
+            zero_condition = TopKCompressor.zero_conditions[name]
+            zero_condition[TopKCompressor.indexes[name]] = 1.0
+            #TODO: Should be revised. Could have bugs for layer-wise communication
+            TopKCompressor.zc = zero_condition
 
     @staticmethod
     def decompress(tensor, ctc, name=None):

@@ -156,8 +156,8 @@ def read_norm_from_log(logfile):
             std = float(items[--1].split(':')[-1])
             means.append(mean)
             stds.append(std)
-    print('means: ', means)
-    print('stds: ', stds)
+    #print('means: ', means)
+    #print('stds: ', stds)
     return means, stds
 
 
@@ -189,8 +189,8 @@ def plot_loss(logfile, label, isacc=False, title='ResNet-20', fixed_color=None):
     losses, times, average_delays, lrs = read_losses_from_log(logfile, isacc=isacc)
     norm_means, norm_stds = read_norm_from_log(logfile)
 
-    print('times: ', times)
-    print('losses: ', losses)
+    #print('times: ', times)
+    #print('losses: ', losses)
     if len(average_delays) > 0:
         delay = int(np.mean(average_delays))
     else:
@@ -211,7 +211,7 @@ def plot_loss(logfile, label, isacc=False, title='ResNet-20', fixed_color=None):
     iterations = np.arange(len(losses)) 
     if SMOOTH_CURVE:
         losses = savgol_filter(losses, 5, 3)
-    print('Algo: %s max acc: %f' % (label, np.max(losses)))
+    print('Algo: %s max acc: %f\n' % (label, np.max(losses)))
     line = ax.plot(iterations, losses, label=label, marker=marker, markerfacecolor='none', color=color, linewidth=1)
     if False and len(norm_means) > 0:
         global ax2
@@ -428,20 +428,21 @@ def plot_convergence(lax=None, network=None, subfig=None):
             line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, force_legend=True, force_color='r')
 
         markeriter = itertools.cycle(markers)
-        density=0.001;
-        for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='blue')
+        #density=0.001;
+        #for nworkers in nworkers_list:
+        #    line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='blue')
 
         for nworkers in nworkers_list:
             lr=0.1
             line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
-            update='v2'
+            #update='v2'
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+            update='r1'
+            lr=0.1
             line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
-            update='v3'
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
-        for nworkers in nworkers_list:
-            bs=16
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,bs=%d)'%(nworkers,bs),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-v1', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+        #for nworkers in nworkers_list:
+        #    bs=16
+        #    line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,bs=%d)'%(nworkers,bs),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-v1', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
 
         markeriter = itertools.cycle(markers)
         density=0.001;lr=0.1;bs=32
