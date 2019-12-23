@@ -90,7 +90,7 @@ def seconds_between_datetimestring(a, b):
 sbd = seconds_between_datetimestring
 
 def get_loss(line, isacc=False):
-    valid = line.find('val acc: ') > 0 if isacc else line.find('loss: ') > 0
+    valid = line.find('val acc: ') > 0 if isacc else line.find('avg loss: ') > 0
     if line.find('Epoch') > 0 and valid: 
         items = line.split(' ')
         loss = float(items[-1])
@@ -420,12 +420,13 @@ def plot_convergence(lax=None, network=None, subfig=None):
         global_max_epochs = 40;bs=32;lr=22.0;nworkers=32
         pass
     elif network == 'resnet20':
-        global_max_epochs = 120;bs=32;lr=0.1
+        global_max_epochs = 140;bs=32;lr=0.1
         markeriter = itertools.cycle(markers)
         #nworkers_list=[32,16,8,4]
-        nworkers_list=[8]
+        nworkers_list=[16];update='r1'
         for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, force_legend=True, force_color='r')
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, force_legend=True, force_color='r')
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, force_legend=True, force_color='r')
 
         markeriter = itertools.cycle(markers)
         #density=0.001;
@@ -433,13 +434,15 @@ def plot_convergence(lax=None, network=None, subfig=None):
         #    line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='blue')
 
         for nworkers in nworkers_list:
-            lr=0.1
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+            #lr=0.1
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
             #update='v2'
             #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
             update='r1'
+            #lr=0.8;bs=32
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,lr=%f)'%(nworkers,lr),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
             lr=0.1
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,lr=%f)'%(nworkers,lr),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
         #for nworkers in nworkers_list:
         #    bs=16
         #    line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,bs=%d)'%(nworkers,bs),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-v1', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
@@ -447,30 +450,41 @@ def plot_convergence(lax=None, network=None, subfig=None):
         markeriter = itertools.cycle(markers)
         density=0.001;lr=0.1;bs=32
         for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'TopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-topk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='g')
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'TopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-topk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='g')
+            update='r1'
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'TopK-SGD (P=%d,lr=%f)'%(nworkers,lr),isacc=isacc,  prefix='allreduce-comp-topk-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='g')
 
     elif network == 'vgg16':
         markeriter = itertools.cycle(markers)
         #nworkers_list=[32,16,8,4]
-        global_max_epochs=120;bs=128;lr=0.1
-        nworkers_list=[8]
+        global_max_epochs=140;bs=128;lr=0.1
+        nworkers_list=[16];update='r1'
         for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, force_legend=True, force_color='r')
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, force_legend=True, force_color='r')
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'Dense-SGD (P=%d)'%nworkers, isacc=isacc, prefix='allreduce-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, force_legend=True, force_color='r')
 
         markeriter = itertools.cycle(markers)
-        density=0.001;
-        for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='blue')
+        #density=0.001;
+        #for nworkers in nworkers_list:
+        #    line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='blue')
 
         markeriter = itertools.cycle(markers)
 
         for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+
+            update='r1'
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,lr=%f)'%(nworkers,lr),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
+            #lr=0.8
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'gTopKR-SGD (P=%d,lr=%f)'%(nworkers,lr),isacc=isacc,  prefix='allreduce-comp-gtopkr-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='black')
 
         markeriter = itertools.cycle(markers)
-        density=0.001;
+        density=0.001;lr=0.1
         for nworkers in nworkers_list:
-            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'TopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-topk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='g')
+            #line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'TopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-topk-baseline-gwarmup-dc1-gtopkjournal', nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='g')
+            update='r1'
+            line = plot_with_params(network, nworkers, bs, lr, 'scigpu10', r'TopK-SGD (P=%d)'%nworkers,isacc=isacc,  prefix='allreduce-comp-topk-baseline-gwarmup-dc1-gtopkjournal-%s'%update, nsupdate=1, sg=2.5, density=density, force_legend=True,force_color='g')
+
 
     elif network == 'lstman4':
         pass

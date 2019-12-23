@@ -43,6 +43,7 @@ class TopKCompressor():
             #nonzero_indexes = nonzero.nonzero().data.squeeze().view(-1)
             #if nonzero_indexes.numel() > 0:
             #    tensor.data[nonzero_indexes] *= 1.1
+            tensor.data.mul_(sigma_scale)
             tensor.data.add_(TopKCompressor.residuals[name].data)
             if name in TopKCompressor.indexes:
                 tensor.data[TopKCompressor.indexes[name]] *= 1.01 # some improvement!
@@ -54,6 +55,7 @@ class TopKCompressor():
             zero_condition = TopKCompressor.zero_conditions[name]
             zero_condition.fill_(1.0)
             zero_condition[indexes] = 0.0
+            TopKCompressor.zc = zero_condition
 
             TopKCompressor.residuals[name].data.fill_(0.)
             TopKCompressor.residuals[name].data = tensor.data * zero_condition
@@ -72,6 +74,11 @@ class TopKCompressor():
     @staticmethod
     def add_residuals(included_indexes, name):
         with torch.no_grad():
+            zero_condition = TopKCompressor.zero_conditions[name]
+            #TODO: Should be revised. Could have bugs for layer-wise communication
+            TopKCompressor.zc = zero_condition
+            if included_indexes is None:
+                return
             residuals = TopKCompressor.residuals[name]
             if type(included_indexes) is np.ndarray:
                 indexes_t = torch.from_numpy(included_indexes).cuda(residuals.device).long()
@@ -81,10 +88,7 @@ class TopKCompressor():
             values.data[indexes_t] = 0.0
             residuals.data[TopKCompressor.indexes[name]] += values.data
             TopKCompressor.indexes[name] = TopKCompressor.indexes[name][indexes_t]
-            zero_condition = TopKCompressor.zero_conditions[name]
             zero_condition[TopKCompressor.indexes[name]] = 1.0
-            #TODO: Should be revised. Could have bugs for layer-wise communication
-            TopKCompressor.zc = zero_condition
 
     @staticmethod
     def decompress(tensor, ctc, name=None):

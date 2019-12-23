@@ -276,8 +276,9 @@ def force_insert_item(d, key, val):
 
 
 class AllReducer():
-    def __init__(self, named_parameters, lock, key_lock, compression, sparse=False, err_callback=None, layerwise_times=None, sigma_scale=2.5, density=0.001, train_epoch=0, norm_clip=None, msg_queue=None, msg_queue2=None, writer=None):
+    def __init__(self, named_parameters, lock, key_lock, compression, sparse=False, err_callback=None, layerwise_times=None, sigma_scale=2.5, density=0.001, train_epoch=0, norm_clip=None, msg_queue=None, msg_queue2=None, writer=None, optimizer=None):
         self._running = False 
+        self._optimizer = optimizer
         self._msg_queue = msg_queue
         self._msg_queue2 = msg_queue2
         self._writer = writer
@@ -633,6 +634,12 @@ class AllReducer():
 
                 density = self.get_current_density()
                 sigma_scale = self.get_approximate_sigma_scale(density)
+                if self._optimizer is not None:
+                    for group in self._optimizer.param_groups:
+                        lr = group['lr']
+                        sigma_scale = lr
+                        #logger.info('sigma_scale: %f', sigma_scale)
+                        break
 
                 if self._norm_clip is not None:
                     norm_clip = np.sqrt(1.0/self.size()) * self._norm_clip

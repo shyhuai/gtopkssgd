@@ -55,7 +55,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._key_lock = threading.Lock()
         self.momentum_correction = True
         try:
-            self._allreducer = ar.AllReducer(named_parameters, self._lock, self._key_lock, compressor, sparse=self._sparse, err_callback=err_handler, layerwise_times=layerwise_times, sigma_scale=sigma_scale, density=density, norm_clip=norm_clip, msg_queue=self._msg_queue, msg_queue2=self._msg_queue2, writer=writer)
+            self._allreducer = ar.AllReducer(named_parameters, self._lock, self._key_lock, compressor, sparse=self._sparse, err_callback=err_handler, layerwise_times=layerwise_times, sigma_scale=sigma_scale, density=density, norm_clip=norm_clip, msg_queue=self._msg_queue, msg_queue2=self._msg_queue2, writer=writer, optimizer=self)
             self.allreducer_thread = threading.Thread(name='allreducer', target=self._allreducer.run)
             self.allreducer_thread.start()
         except Exception as e:
@@ -114,13 +114,13 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         if closure is not None:
             loss = closure()
     
+        offset = 0
         for group in self.param_groups:
             weight_decay = group['weight_decay']
             momentum = group['momentum']
             dampening = group['dampening']
             nesterov = group['nesterov']
 
-            offset = 0
             for p in group['params']:
                 if p.grad is None:
                     continue
@@ -140,11 +140,15 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                         d_p = d_p.add(momentum, buf)
                     else:
                         d_p = buf
-                p.data.add_(-group['lr'], d_p)
+                if self.momentum_correction:
+                    p.data.add_(-1, d_p)
+                else:
+                    p.data.add_(-group['lr'], d_p)
                 if momentum != 0 and self.momentum_correction:
                     param_state = self.state[p]
                     buf = param_state['momentum_buffer']
-                    buf.view(-1).mul_(self._compressor.zc[offset:d_p.numel()])
+                    buf.view(-1).mul_(self._compressor.zc[offset:offset+d_p.numel()])
+                    offset += d_p.numel()
         return loss
 
     def _step_with_lars(self, closure=None):

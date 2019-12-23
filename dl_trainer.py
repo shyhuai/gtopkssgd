@@ -189,7 +189,7 @@ class DLTrainer:
         elif self.dataset == 'imagenet':
             weight_decay = 5e-4
         elif self.dataset == 'cifar10':
-            weight_decay = 0 #1e-4
+            weight_decay = 1e-4
 
         self.optimizer = optim.SGD(self.net.parameters(), 
                 lr=self.lr,
