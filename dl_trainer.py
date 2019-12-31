@@ -557,33 +557,21 @@ class DLTrainer:
         return self.lr 
 
     def _adjust_learning_rate_gtopk(self, progress, optimizer):
-        #warmup = 10
-        #if settings.WARMUP and progress < warmup:
-        #    warmup_total_iters = self.num_batches_per_epoch * warmup
-        #    min_lr = self.base_lr / self.nworkers
-        #    lr_interval = (self.base_lr - min_lr) / warmup_total_iters
-        #    self.lr = min_lr + lr_interval * self.train_iter
-        #    for param_group in optimizer.param_groups:
-        #        param_group['lr'] = self.lr
-        #    return self.lr
-        decay = 1
-        first = 81
-        second = first + 41
-        third = second+33
-        if progress < first:
-            decay = 1.0
-        elif progress < second:
-            decay = 0.1
-        elif progress < third:
-            decay = 0.01
-        else:
-            decay = 0.001
-        if self.train_iter % self.num_batches_per_epoch == 0:
-            base_lr = self.base_lr * decay
-            lr = base_lr 
-        else:
-            base_lr = self.base_lr * decay
-            lr = base_lr + (base_lr*1.1 - base_lr)/(self.num_batches_per_epoch+2) * (self.train_iter % self.num_batches_per_epoch)
+        warmup = 5
+        if settings.WARMUP and progress < warmup:
+            warmup_total_iters = self.num_batches_per_epoch * warmup
+            min_lr = self.base_lr / self.nworkers
+            lr_interval = (self.base_lr - min_lr) / warmup_total_iters
+            self.lr = min_lr + lr_interval * self.train_iter
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = self.lr
+            return self.lr
+        max_lr = self.base_lr
+        base_lr = max_lr/10
+        stepsize = 10
+        cycle = 1 + progress// (2*stepsize)
+        x = abs(progress//stepsize - 2*cycle +1)
+        lr =  base_lr + (max_lr - base_lr) * max(0, 1-x)
         self.lr = lr
         for param_group in optimizer.param_groups:
             param_group['lr'] = self.lr

@@ -25,6 +25,7 @@ class TopKCompressor():
     sparsities = []
     t = 0.
     zero_conditions = {}
+    delay_counters = {}
     zc = None
     values = {} 
     indexes = {} 
@@ -35,6 +36,7 @@ class TopKCompressor():
         with torch.no_grad():
             if name not in TopKCompressor.residuals:
                 TopKCompressor.residuals[name] = torch.zeros_like(tensor.data)
+                TopKCompressor.delay_counters[name] = torch.ones_like(tensor.data)
             # top-k solution
             numel = tensor.numel()
             k = max(int(numel * ratio), 1)
@@ -43,10 +45,11 @@ class TopKCompressor():
             #nonzero_indexes = nonzero.nonzero().data.squeeze().view(-1)
             #if nonzero_indexes.numel() > 0:
             #    tensor.data[nonzero_indexes] *= 1.1
-            tensor.data.mul_(sigma_scale)
+            #tensor.data.mul_(sigma_scale)
+            #if name in TopKCompressor.indexes:
+            #    tensor.data[TopKCompressor.indexes[name]] *= 10.0 # some improvement!
+            #tensor.data.mul_(TopKCompressor.delay_counters[name].data)
             tensor.data.add_(TopKCompressor.residuals[name].data)
-            if name in TopKCompressor.indexes:
-                tensor.data[TopKCompressor.indexes[name]] *= 1.01 # some improvement!
 
             values, indexes = torch.topk(torch.abs(tensor.data), k=k)
             values = tensor.data[indexes]
@@ -57,7 +60,6 @@ class TopKCompressor():
             zero_condition[indexes] = 0.0
             TopKCompressor.zc = zero_condition
 
-            TopKCompressor.residuals[name].data.fill_(0.)
             TopKCompressor.residuals[name].data = tensor.data * zero_condition
             tensor.data.sub_(TopKCompressor.residuals[name].data)
 
@@ -88,12 +90,25 @@ class TopKCompressor():
             values.data[indexes_t] = 0.0
             residuals.data[TopKCompressor.indexes[name]] += values.data
             TopKCompressor.indexes[name] = TopKCompressor.indexes[name][indexes_t]
-            zero_condition[TopKCompressor.indexes[name]] = 1.0
+            #delay_counter = TopKCompressor.delay_counters[name]
+            #delay_counter.add_(1)
+            #delay_counter[TopKCompressor.indexes[name]] = 1
+            #delay_counter[delay_counter>4] = 4 # something good
+            #delay_counter[delay_counter>4] = 3 
+            zero_condition.fill_(1.0)
+            zero_condition[TopKCompressor.indexes[name]] = 0.0
 
     @staticmethod
     def decompress(tensor, ctc, name=None):
         z = tensor 
         return z 
+
+    @staticmethod
+    def clear_residuals():
+        for k in TopKCompressor.residuals:
+            v = TopKCompressor.residuals[k]
+            v.fill_(0.0)
+
 
 class TopKCompressor2(TopKCompressor):
     name = 'topk2'

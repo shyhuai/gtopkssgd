@@ -127,7 +127,11 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                 d_p = p.grad.data
                 name = self._parameter_names.get(p)
                 if weight_decay != 0:
-                    d_p.add_(weight_decay, p.data)
+                    wd = p.data
+                    #if self.momentum_correction:
+                    #    tmp = wd.view(-1) * (1-self._compressor.zc[offset:offset+p.numel()])
+                    #    wd = tmp.view(wd.shape)
+                    d_p.add_(weight_decay, wd)
                 if momentum != 0 and not self.momentum_correction:
                     param_state = self.state[p]
                     if 'momentum_buffer' not in param_state:
@@ -140,10 +144,11 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                         d_p = d_p.add(momentum, buf)
                     else:
                         d_p = buf
-                if self.momentum_correction:
-                    p.data.add_(-1, d_p)
-                else:
-                    p.data.add_(-group['lr'], d_p)
+                #if self.momentum_correction:
+                #    p.data.add_(-1, d_p)
+                #else:
+                #d_p.mul_(1 + torch.log(1+d_p.norm()))
+                p.data.add_(-group['lr'], d_p)
                 if momentum != 0 and self.momentum_correction:
                     param_state = self.state[p]
                     buf = param_state['momentum_buffer']
@@ -161,6 +166,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         if closure is not None:
             loss = closure()
     
+        offset = 0
         for group in self.param_groups:
             weight_decay = group['weight_decay']
             momentum = group['momentum']
@@ -171,12 +177,11 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                 if p.grad is None:
                     continue
                 d_p = p.grad.data
-                weight_norm = torch.norm(p.data)
+                weight_norm = torch.norm(p.data.view(-1)*self._compressor.zc[offset:offset+d_p.numel()])
                 grad_norm = torch.norm(d_p)
                 local_lr = eta * weight_norm / (grad_norm + weight_decay * weight_norm+1e-6)
                 actual_lr = local_lr * lr 
                 name = self._parameter_names.get(p)
-                #logger.info('name:%s, weight_norm: %f, grad_norm: %f, local_lr: %f, actual_lr: %f', name, weight_norm.item(), grad_norm.item(), local_lr, actual_lr)
 
                 param_state = self.state[p]
                 if 'momentum_buffer' not in param_state:
@@ -185,6 +190,12 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                     buf = param_state['momentum_buffer']
                 buf.mul_(momentum).add_(actual_lr, d_p + weight_decay * p.data)
                 p.data.add_(-buf)
+
+                if momentum != 0 and self.momentum_correction:
+                    param_state = self.state[p]
+                    buf = param_state['momentum_buffer']
+                    buf.view(-1).mul_(self._compressor.zc[offset:offset+d_p.numel()])
+                    offset += d_p.numel()
         return loss
 
     def _step_with_mc(self, closure=None):
@@ -240,6 +251,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
 
     def add_train_epoch(self):
         self._allreducer.train_epoch += 1
+        #self._compressor.clear_residuals()
 
     def get_current_density(self):
         return self._allreducer.get_current_density()

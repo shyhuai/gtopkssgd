@@ -323,6 +323,7 @@ class AllReducer():
 
 
         self._dynamic_densities = [0.25, 0.0625, 0.015625, 0.004, 0.001] # the setting used in DGC
+        #self._dynamic_densities = [0.25, 0.0625, 0.03, 0.015625, 0.01, 0.005, 0.003, 0.002, 0.001] # 
         #self._dynamic_densities = [0.004] # the tuned one 
         if self._dynamic_densities is not None:
             self._dynamic_densities.append(self._density)

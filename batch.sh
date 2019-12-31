@@ -1,16 +1,15 @@
-#dnns=( "resnet20" "vgg16" )
 dnns=( "resnet20" "vgg16" )
+#dnns=( "resnet110" )
 #compressors=( "gtopk" "topk" ) 
-compressors=( "gtopkr" ) 
+#compressors=( "gtopkr" ) 
 #compressors=( "topk" ) 
-#compressors=( "topk" "gtopkr" "none" ) 
+compressors=( "topk" "gtopkr" ) 
 #compressors=( "none" ) 
 #ns=( "32" "16" "8" "4" )
-ns=( "16" )
+ns=( "8" )
 density=0.001
 lr=0.1
-#lr=0.0125
-#lr=0.8
+bs=32
 for dnn in "${dnns[@]}"
 do
     for nworkers in "${ns[@]}"
@@ -20,7 +19,7 @@ do
             if [ "$compressor" = "none" ]; then 
                 dnn=$dnn nworkers=$nworkers ./horovod_mpi.sh
             else
-                lr=$lr dnn=$dnn density=$density nworkers=$nworkers compressor=$compressor ./gtopk_mpi.sh
+                batch_size=$bs lr=$lr dnn=$dnn density=$density nworkers=$nworkers compressor=$compressor ./gtopk_mpi.sh
             fi
         done
     done

@@ -24,7 +24,7 @@ def plot_update_index(compressor, bs, version='v2'):
 #plt.title('%s, bs=%d'%(compressor, bs))
 plot_update_index('gtopkr', 16)
 plot_update_index('gtopkr', 32)
-plot_update_index('gtopkr', 32, 'v3')
+plot_update_index('gtopkr', 32, 'r4')
 plot_update_index('topk', 32)
 plt.legend()
 plt.show()
