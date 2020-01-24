@@ -36,7 +36,7 @@ torch.manual_seed(0)
 torch.set_num_threads(1)
 
 _support_datasets = ['imagenet', 'cifar10', 'an4', 'ptb', 'mnist']
-_support_dnns = ['resnet50', 'resnet20', 'resnet56', 'resnet110', 'vgg19', 'vgg16', 'alexnet', 'lstman4', 'lstm']
+_support_dnns = ['resnet50', 'resnet20', 'resnet56', 'resnet110', 'vgg19', 'vgg16', 'alexnet', 'lstman4', 'lstm', 'mnistflnet', 'cifar10flnet']
 
 NUM_CPU_THREADS=1
 
@@ -74,6 +74,51 @@ class MnistNet(nn.Module):
         x = self.fc2(x)
         return x
 
+class MnistFLNet(nn.Module):
+    def __init__(self):
+        super(MnistFLNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 5, 1, 2)
+        self.conv2 = nn.Conv2d(32, 64, 5, 1, 2)
+        self.fc1 = nn.Linear(3136, 512)
+        self.fc2 = nn.Linear(512, 10)
+        self.name = 'mnistflnet'
+
+    def forward(self, x):
+        x = F.max_pool2d(F.relu(self.conv1(x)), 2)
+        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+        x = x.view(-1, 3136)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return F.softmax(x)
+
+class Cifar10FLNet(nn.Module):
+    def __init__(self):
+        super(Cifar10FLNet, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, 5, 1, 2)
+        self.pool1 = nn.MaxPool2d(3, 2, 1)
+        self.conv2 = nn.Conv2d(64, 64, 5, 1, 2)
+        self.pool2 = nn.MaxPool2d(3, 2, 1)
+        self.norm1 = nn.LocalResponseNorm(size=4, alpha=0.001/9.0, beta=0.75, k=1.0)
+        self.norm2 = nn.LocalResponseNorm(size=4, alpha=0.001/9.0, beta=0.75, k=1.0)
+        self.fc1 = nn.Linear(4096, 384)
+        self.fc2 = nn.Linear(384, 192)
+        self.fc3 = nn.Linear(192, 10)
+        self.name = 'cifar10flnet'
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.pool1(x)
+        x = self.norm1(x)
+        x = F.relu(self.conv2(x))
+        x = self.norm2(x)
+        x = self.pool2(x)
+        x = x.view(-1, 4096)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return F.softmax(x)
+
+
 def get_available_gpu_device_ids(ngpus):
     return range(0, ngpus)
 
@@ -85,6 +130,10 @@ def create_net(num_classes, dnn='resnet20', **kwargs):
         net = models.__dict__['resnet50'](num_classes=num_classes)
     elif dnn == 'mnistnet':
         net = MnistNet()
+    elif dnn == 'mnistflnet':
+        net = MnistFLNet()
+    elif dnn == 'cifar10flnet':
+        net = Cifar10FLNet()
     elif dnn == 'vgg16':
         net = models.VGG(dnn.upper())
     elif dnn == 'alexnet':
@@ -577,12 +626,29 @@ class DLTrainer:
             param_group['lr'] = self.lr
         return self.lr 
 
+    def _adjust_learning_rate_icdcs2020compare(self, progress, optimizer):
+        warmup = 5
+        if settings.WARMUP and progress < warmup:
+            warmup_total_iters = self.num_batches_per_epoch * warmup
+            min_lr = self.base_lr / self.nworkers
+            lr_interval = (self.base_lr - min_lr) / warmup_total_iters
+            self.lr = min_lr + lr_interval * self.train_iter
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = self.lr
+            return self.lr
+        lr = self.base_lr * (0.992 ** (progress-warmup))
+        self.lr = lr
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = self.lr
+        return self.lr
+
     def adjust_learning_rate(self, progress, optimizer):
         if self.dnn == 'lstman4':
            return self._adjust_learning_rate_lstman4(self.train_iter//self.num_batches_per_epoch, optimizer)
         elif self.dnn == 'lstm':
             return self._adjust_learning_rate_lstmptb(progress, optimizer)
         return self._adjust_learning_rate_general(progress, optimizer)
+        #return self._adjust_learning_rate_icdcs2020compare(progress, optimizer)
         #return self._adjust_learning_rate_gtopk(progress, optimizer)
 
     def print_weight_gradient_ratio(self):
