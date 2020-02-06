@@ -547,7 +547,7 @@ class AllReducer():
         full_mean = None
         full_var = None
 
-        if self._compression.name in ['topk', 'topk2']:
+        if self._compression.name in ['topk', 'topk2', 'topkdense']:
             result, global_indexes, included_indexes = topk_sparse_allreduce(self._comm, entry, self._sparse_storages[name], indexes=topk_indexes, dtype=np.float32)
         elif self._compression.name in ['gtopk']:
             result, global_indexes, included_indexes = gtopk_sparse_allreduce(self._comm, entry, storage=self._sparse_storages[name], indexes=topk_indexes, dtype=np.float32)
