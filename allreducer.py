@@ -23,7 +23,7 @@ MPI_TYPES = {
         np.float16: mpi_float16
         }
 
-THRESHOLD = 100*1024*1024
+THRESHOLD = 200*1024*1024
 #THRESHOLD = 8192 
 
 
@@ -321,10 +321,10 @@ class AllReducer():
         self._d2h_times = {}
         self._profiling_norms = []
 
-
         self._dynamic_densities = [0.25, 0.0625, 0.015625, 0.004, 0.001] # the setting used in DGC
         #self._dynamic_densities = [0.25, 0.0625, 0.03, 0.015625, 0.01, 0.005, 0.003, 0.002, 0.001] # 
-        #self._dynamic_densities = None #[0.004] # the tuned one 
+        #self._dynamic_densities = [0.004] # the tuned one 
+        #self._dynamic_densities = None 
         if self._dynamic_densities is not None:
             self._dynamic_densities.append(self._density)
             logger.info('dynamic densities = %s', self._dynamic_densities)
@@ -383,7 +383,7 @@ class AllReducer():
             for k in g:
                 flags.append(0)
             self._groups_flags.append(flags)
-        logger.info('offsets: ', self._merged_parameter_offsets)
+        #logger.info('offsets: %s', self._merged_parameter_offsets)
         for k, v in self._merged_parameters.items():
             self._update_index_counter[k] = torch.zeros_like(v)
 
@@ -505,6 +505,10 @@ class AllReducer():
                 density = self._dynamic_densities[-1]
             else:
                 density = self._dynamic_densities[self.train_epoch]
+        if self._compression.name == 'topkdense':
+            epoch_to_switch = 110
+            if self.train_epoch > epoch_to_switch:
+                density = 1
         return density
 
     def get_approximate_sigma_scale(self, density):
@@ -564,7 +568,7 @@ class AllReducer():
             tensor[final_indexes] = r
             if settings.PROFILING_INDEX:
                 self._update_index_counter[name][final_indexes] += 1
-        elif self._compression.name in ['topk', 'topk2']:
+        elif self._compression.name in ['topk', 'topk2', 'topkdense']:
             num_workers = self._comm.size
             nnz = topk_indexes.size(0)
             for i in range(num_workers):
@@ -674,8 +678,8 @@ class AllReducer():
 
                 # Allreduce on the merged gradients 
                 stime = time.time()
-                if self._sparse:
-
+                density = self.get_current_density()
+                if self._sparse and density < 1:
                     result, included_indexes, full_mean = self._sparse_allreduce(new_name, new_tensor, selected_tensor, original_shape, topk_indexes=ctx)
                     if included_indexes is not None:
                         if full_mean is not None:

@@ -3,6 +3,7 @@ from __future__ import print_function
 import torch
 import numpy as np
 import time
+import random
 
 
 class NoneCompressor():
@@ -41,16 +42,10 @@ class TopKCompressor():
             numel = tensor.numel()
             k = max(int(numel * ratio), 1)
 
-            #nonzero = torch.abs(TopKCompressor.residuals[name]) > 0
-            #nonzero_indexes = nonzero.nonzero().data.squeeze().view(-1)
-            #if nonzero_indexes.numel() > 0:
-            #    tensor.data[nonzero_indexes] *= 1.1
-            #tensor.data.mul_(sigma_scale)
             #if name in TopKCompressor.indexes:
-            #    tensor.data[TopKCompressor.indexes[name]] *= 10.0 # some improvement!
+            #    tensor.data[TopKCompressor.indexes[name]] *= 1.1 # some improvement!
             #tensor.data.mul_(TopKCompressor.delay_counters[name].data)
             tensor.data.add_(TopKCompressor.residuals[name].data)
-
             values, indexes = torch.topk(torch.abs(tensor.data), k=k)
             values = tensor.data[indexes]
             if name not in TopKCompressor.zero_conditions:
@@ -77,7 +72,7 @@ class TopKCompressor():
     def add_residuals(included_indexes, name):
         with torch.no_grad():
             zero_condition = TopKCompressor.zero_conditions[name]
-            #TODO: Should be revised. Could have bugs for layer-wise communication
+            #TODO: Should be revised. It could have bugs for layer-wise communication
             TopKCompressor.zc = zero_condition
             if included_indexes is None:
                 return
@@ -90,11 +85,11 @@ class TopKCompressor():
             values.data[indexes_t] = 0.0
             residuals.data[TopKCompressor.indexes[name]] += values.data
             TopKCompressor.indexes[name] = TopKCompressor.indexes[name][indexes_t]
-            #delay_counter = TopKCompressor.delay_counters[name]
-            #delay_counter.add_(1)
-            #delay_counter[TopKCompressor.indexes[name]] = 1
-            #delay_counter[delay_counter>4] = 4 # something good
-            #delay_counter[delay_counter>4] = 3 
+            delay_counter = TopKCompressor.delay_counters[name]
+            delay_counter.add_(1)
+            delay_counter[TopKCompressor.indexes[name]] = 1
+            #delay_counter[delay_counter>5] = 5 # something good
+            delay_counter[delay_counter>6] = 6
             zero_condition.fill_(1.0)
             zero_condition[TopKCompressor.indexes[name]] = 0.0
 
@@ -113,11 +108,20 @@ class TopKCompressor():
 class TopKCompressor2(TopKCompressor):
     name = 'topk2'
 
+
 class gTopKCompressor(TopKCompressor):
     name = 'gtopk'
 
+
 class gTopKRecursiveCompressor(TopKCompressor):
     name = 'gtopkr'
+
+
+class TopKDenseCompressor(TopKCompressor):
+    """
+    Sparse + Dense for Distributed Gradient Descent
+    """
+    name = 'topkdense'
 
 
 compressors = {
@@ -125,5 +129,6 @@ compressors = {
         'topk2': TopKCompressor2,
         'gtopk': gTopKCompressor,
         'gtopkr': gTopKRecursiveCompressor,
+        'topkdense': TopKDenseCompressor,
         'none': NoneCompressor
         }

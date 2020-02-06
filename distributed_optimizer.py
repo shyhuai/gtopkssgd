@@ -128,14 +128,12 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                 name = self._parameter_names.get(p)
                 if weight_decay != 0:
                     wd = p.data
-                    #if self.momentum_correction:
-                    #    tmp = wd.view(-1) * (1-self._compressor.zc[offset:offset+p.numel()])
-                    #    wd = tmp.view(wd.shape)
                     d_p.add_(weight_decay, wd)
                 if momentum != 0 and not self.momentum_correction:
                     param_state = self.state[p]
                     if 'momentum_buffer' not in param_state:
-                        buf = param_state['momentum_buffer'] = torch.zeros_like(p.data)
+                        param_state['momentum_buffer'] = torch.zeros_like(p.data)
+                        buf = param_state['momentum_buffer']
                         buf.mul_(momentum).add_(d_p)
                     else:
                         buf = param_state['momentum_buffer']
@@ -144,10 +142,6 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                         d_p = d_p.add(momentum, buf)
                     else:
                         d_p = buf
-                #if self.momentum_correction:
-                #    p.data.add_(-1, d_p)
-                #else:
-                #d_p.mul_(1 + torch.log(1+d_p.norm()))
                 p.data.add_(-group['lr'], d_p)
                 if momentum != 0 and self.momentum_correction:
                     param_state = self.state[p]

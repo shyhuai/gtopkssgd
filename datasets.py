@@ -11,7 +11,8 @@ class DatasetHDF5(torch.utils.data.Dataset):
         t: 'train' or 'val'
         """
         super(DatasetHDF5, self).__init__()
-        self.hf = h5py.File(hdf5fn, 'r', libver='latest', swmr=True)
+        #self.hf = h5py.File(hdf5fn, 'r', libver='latest', swmr=True)
+        self.hf = h5py.File(hdf5fn, 'r', libver='latest')
         self.t = t
         self.n_images= self.hf['%s_img'%self.t].shape[0]
         self.dlabel = self.hf['%s_labels'%self.t][...]
