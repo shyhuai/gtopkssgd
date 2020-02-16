@@ -38,13 +38,16 @@ class TopKCompressor():
             if name not in TopKCompressor.residuals:
                 TopKCompressor.residuals[name] = torch.zeros_like(tensor.data)
                 TopKCompressor.delay_counters[name] = torch.ones_like(tensor.data)
+                #res_norm = 1.0
+                #res_norm = TopKCompressor.residuals[name].data.norm()
             # top-k solution
             numel = tensor.numel()
             k = max(int(numel * ratio), 1)
 
             #if name in TopKCompressor.indexes:
             #    tensor.data[TopKCompressor.indexes[name]] *= 1.1 # some improvement!
-            #tensor.data.mul_(TopKCompressor.delay_counters[name].data)
+
+            tensor.data.mul_(TopKCompressor.delay_counters[name].data)
             tensor.data.add_(TopKCompressor.residuals[name].data)
             values, indexes = torch.topk(torch.abs(tensor.data), k=k)
             values = tensor.data[indexes]
@@ -60,6 +63,16 @@ class TopKCompressor():
 
             TopKCompressor.values[name] = values
             TopKCompressor.indexes[name] = indexes
+
+            delay_counter = TopKCompressor.delay_counters[name]
+            #ADD=0.3; MAX_DELAY=1.5 # For VGG-16: ADD=0.3; MAX_DELAY=1.5, @devidenorm1
+            #ADD=0.6; MAX_DELAY=1.3 # For VGG-16: ADD=0.6; MAX_DELAY=1.3, @devidenorm2
+            #ADD=1;MAX_DELAY=6 # For ResNet-20: Add=1; MAX_DELAY=6,@devidenorm
+            ADD=0.6*4;MAX_DELAY=1.3*4
+            delay_counter.add_(ADD) 
+            delay_counter[TopKCompressor.indexes[name]] = 1
+            delay_counter[delay_counter>MAX_DELAY] = MAX_DELAY
+
             return tensor, indexes 
 
     @staticmethod

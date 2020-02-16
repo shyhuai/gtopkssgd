@@ -82,7 +82,8 @@ class _DistributedOptimizer(torch.optim.Optimizer):
             if not self.local:
                 name = self._parameter_names.get(p)
                 d_p = p.grad.data
-                if self.momentum_correction:
+                density = self._allreducer.get_current_density()
+                if self.momentum_correction and density < 1:
                     param_state = self.state[p]
                     momentum = 0.9
                     if 'momentum_buffer' not in param_state:
@@ -115,6 +116,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
             loss = closure()
     
         offset = 0
+        density = self._allreducer.get_current_density()
         for group in self.param_groups:
             weight_decay = group['weight_decay']
             momentum = group['momentum']
@@ -143,7 +145,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                     else:
                         d_p = buf
                 p.data.add_(-group['lr'], d_p)
-                if momentum != 0 and self.momentum_correction:
+                if momentum != 0 and self.momentum_correction and density < 1:
                     param_state = self.state[p]
                     buf = param_state['momentum_buffer']
                     buf.view(-1).mul_(self._compressor.zc[offset:offset+d_p.numel()])

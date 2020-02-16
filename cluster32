@@ -1,4 +1,2 @@
-scigpu13 slots=16
-scigpu12 slots=8
-scigpu11 slots=4
-scigpu10 slots=4
+scigpu11 slots=16
+scigpu12 slots=16
